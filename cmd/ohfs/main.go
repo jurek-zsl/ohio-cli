@@ -11,7 +11,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -515,7 +514,7 @@ func handleWatchUpload(filePath string, opts api.UploadOptions, flagQR bool) err
 
 	lastMod := fi.ModTime()
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(sigChan, os.Interrupt)
 
 	ticker := time.NewTicker(400 * time.Millisecond)
 	defer ticker.Stop()
@@ -1095,7 +1094,9 @@ func killOtherProcesses() {
 			for _, line := range lines {
 				pid, parseErr := strconv.Atoi(strings.TrimSpace(line))
 				if parseErr == nil && pid != myPID && pid > 0 {
-					_ = syscall.Kill(pid, syscall.SIGTERM)
+					if proc, err := os.FindProcess(pid); err == nil {
+						_ = proc.Kill()
+					}
 				}
 			}
 		}

@@ -70,21 +70,40 @@ if [ -n "$LOCAL_CANDIDATE" ]; then
   cp -f "$LOCAL_CANDIDATE" "$INSTALL_DIR/ohio"
 else
   # Remote release download
-  DOWNLOAD_URL="https://api.ohiofiles.cloud/releases/latest/ohio-${OS}-${ARCH_TARGET}"
-  echo -e "  ${GRAY}• Downloading OhioCLI for ${OS}/${ARCH_TARGET}...${RESET}"
-  if command -v curl >/dev/null 2>&1; then
-    curl -fsSL "$DOWNLOAD_URL" -o "$INSTALL_DIR/ohio" || {
-      # Fallback build if go is installed
-      if command -v go >/dev/null 2>&1 && [ -d "$LOCAL_BIN_SCRIPT_DIR/cli" ]; then
-        echo -e "  ${GRAY}• Compiling native binary using Go...${RESET}"
-        (cd "$LOCAL_BIN_SCRIPT_DIR/cli" && GOCACHE=/tmp/gocache GOPATH=/tmp/gopath go build -o "$INSTALL_DIR/ohio" ./cmd/ohfs)
-      else
-        echo -e "${RED}✖ Failed downloading pre-built binary.${RESET}"
-        exit 1
+  CANDIDATE_URLS=(
+    "https://github.com/jurek-zsl/ohio-cli/releases/latest/download/ohio-${OS}-${ARCH_TARGET}"
+    "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.1.0/ohio-${OS}-${ARCH_TARGET}"
+    "https://api.ohiofiles.cloud/releases/latest/ohio-${OS}-${ARCH_TARGET}"
+  )
+  DOWNLOADED=0
+
+  for URL in "${CANDIDATE_URLS[@]}"; do
+    echo -e "  ${GRAY}• Attempting download from ${URL}...${RESET}"
+    if curl -fsSL "$URL" -o "$INSTALL_DIR/ohio" 2>/dev/null; then
+      if [ -s "$INSTALL_DIR/ohio" ] && [ $(wc -c < "$INSTALL_DIR/ohio") -gt 500000 ]; then
+        DOWNLOADED=1
+        break
       fi
-    }
-  else
-    echo -e "${RED}✖ curl is required to install.${RESET}"
+    fi
+  done
+
+  if [ "$DOWNLOADED" -eq 0 ]; then
+    # Fallback to Go build if installed
+    if command -v go >/dev/null 2>&1; then
+      echo -e "  ${GRAY}• Remote binary unavailable, compiling using Go...${RESET}"
+      if go install github.com/jurek-zsl/ohio-cli/cmd/ohfs@latest 2>/dev/null; then
+        GOBIN_SRC="$(go env GOPATH)/bin/ohfs"
+        if [ -f "$GOBIN_SRC" ]; then
+          cp -f "$GOBIN_SRC" "$INSTALL_DIR/ohio"
+          DOWNLOADED=1
+        fi
+      fi
+    fi
+  fi
+
+  if [ "$DOWNLOADED" -eq 0 ]; then
+    echo -e "${RED}✖ Failed downloading or compiling OhioCLI.${RESET}"
+    echo -e "  Install with Go: go install github.com/jurek-zsl/ohio-cli/cmd/ohfs@latest"
     exit 1
   fi
 fi
