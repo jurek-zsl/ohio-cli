@@ -1,0 +1,155 @@
+{
+  "title": "OhioFiles Documentation",
+  "tagline": "User Guide and System Reference for OhioFiles",
+  "accentColor": "#283743",
+  "font": "sans",
+  "theme": "dark",
+  "backgroundPattern": "glow",
+  "backgroundBlur": "md",
+  "backgroundOpacity": 0.3,
+  "contentWidth": "wide",
+  "showToc": true,
+  "links": [
+    {
+      "label": "Website",
+      "url": "https://ohiofiles.cloud"
+    },
+    {
+      "label": "Upload",
+      "url": "https://ohiofiles.cloud/"
+    },
+    {
+      "label": "Public Feed",
+      "url": "https://ohiofiles.cloud/public"
+    }
+  ],
+  "footerText": "OhioFiles - High-performance, login-free file hosting and knowledge system.",
+  "folders": [
+    "1. Start",
+    "2. Core Features",
+    "3. Collaboration & Social",
+    "4. Customization & Tools"
+  ],
+  "pageHierarchy": {
+    "README.md": {
+      "folder": "1. Start",
+      "parentId": null
+    },
+    "getting-started.md": {
+      "folder": "1. Start",
+      "parentId": null
+    },
+    "file-hosting-and-upload.md": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "content-explorer.md": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "folders-and-sharing.md": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "file-previews.md": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "text-notebook.md": {
+      "folder": "2. Core Features",
+      "parentId": "Overview"
+    },
+    "documentation-portals.md": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "encrypted-chats.md": {
+      "folder": "3. Collaboration & Social",
+      "parentId": null
+    },
+    "public-feed-and-social.md": {
+      "folder": "3. Collaboration & Social",
+      "parentId": null
+    },
+    "profiles.md": {
+      "folder": "3. Collaboration & Social",
+      "parentId": null
+    },
+    "themes-and-custom-css.md": {
+      "folder": "4. Customization & Tools",
+      "parentId": null
+    },
+    "session-tools-and-backups.md": {
+      "folder": "4. Customization & Tools",
+      "parentId": null
+    },
+    "notifications-and-pwa.md": {
+      "folder": "4. Customization & Tools",
+      "parentId": null
+    },
+    "api-and-cli-usage.md": {
+      "folder": "4. Customization & Tools",
+      "parentId": null
+    },
+    "cmumcrvlk010r4b55vuw831t7": {
+      "folder": "1. Start",
+      "parentId": null
+    },
+    "cmumcrv9l010b4b55liqxselz": {
+      "folder": "1. Start",
+      "parentId": null
+    },
+    "cmumcrtp600zf4b55bcovja82": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "cmumcrue800zn4b55ds8qe6f5": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "cmumcrulu00zz4b55xo5gs08c": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "cmumcrus101034b55txj6ju6l": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "cmumcrut801074b55wnhueww7": {
+      "folder": "2. Core Features",
+      "parentId": null
+    },
+    "cmumcrvrq010z4b559yqcft2c": {
+      "folder": "2. Core Features",
+      "parentId": "Overview"
+    },
+    "cmumcruk900zv4b55qwd96o4y": {
+      "folder": "3. Collaboration & Social",
+      "parentId": null
+    },
+    "cmumcrvfg010j4b55ptrw2lv6": {
+      "folder": "3. Collaboration & Social",
+      "parentId": null
+    },
+    "cmumcrvfh010l4b55io3hn6z3": {
+      "folder": "3. Collaboration & Social",
+      "parentId": null
+    },
+    "cmumcrtp500zd4b555qhy6fu9": {
+      "folder": "4. Customization & Tools",
+      "parentId": null
+    },
+    "cmumcrv9n010d4b550i3bncds": {
+      "folder": "4. Customization & Tools",
+      "parentId": null
+    },
+    "cmumcrvlm010t4b5553nkyqmt": {
+      "folder": "4. Customization & Tools",
+      "parentId": null
+    },
+    "cmumcrvs301134b55ahbsdidr": {
+      "folder": "4. Customization & Tools",
+      "parentId": null
+    }
+  }
+}
