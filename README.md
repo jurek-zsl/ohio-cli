@@ -32,13 +32,13 @@ Install OhioCLI in seconds on any major operating system. Both installers config
 
 ### Linux & macOS (Bash / Zsh)
 ```bash
-curl -fsSL https://ohiofiles.cloud/install.sh | bash
+curl -fsSL https://api.ohiofiles.cloud/install-sh | bash
 ```
 > *Or from a cloned repository:* `./install.sh`
 
 ### Windows (PowerShell)
 ```powershell
-irm https://ohiofiles.cloud/install.ps1 | iex
+irm https://api.ohiofiles.cloud/install-ps1 | iex
 ```
 > *Or locally via PowerShell:* `powershell -ExecutionPolicy Bypass -File .\install.ps1`
 
