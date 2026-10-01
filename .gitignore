@@ -1,2 +1,5 @@
 bin/
 *.log
+.DS_Store
+/ohio
+/ohfs

@@ -48,7 +48,7 @@ jobs:
           GOARCH: ${{ matrix.arch }}
           CGO_ENABLED: 0
         run: |
-          go build -ldflags="-s -w" -o dist/${{ matrix.output }} ./cmd/ohfs
+          go build -ldflags="-s -w" -o dist/${{ matrix.output }} ./cmd/ohio
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

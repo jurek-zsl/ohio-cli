@@ -50,7 +50,7 @@ if ($LocalBinary) {
     # Candidate release URLs
     $CandidateUrls = @(
         "https://github.com/jurek-zsl/ohio-cli/releases/latest/download/ohio-windows-$Arch.exe",
-        "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.1.0/ohio-windows-$Arch.exe",
+        "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.2.0/ohio-windows-$Arch.exe",
         "https://api.ohiofiles.cloud/releases/latest/ohio-windows-$Arch.exe"
     )
     
@@ -76,13 +76,13 @@ if ($LocalBinary) {
             try {
                 git clone --depth 1 https://github.com/jurek-zsl/ohio-cli.git $TempBuild
                 Push-Location $TempBuild
-                go build -o $OhioExe .\cmd\ohfs
+                go build -o $OhioExe .\cmd\ohio
                 Pop-Location
                 $Downloaded = $true
             } catch {
                 Write-Host "• Falling back to go install..." -ForegroundColor Gray
-                go install github.com/jurek-zsl/ohio-cli/cmd/ohfs@latest
-                $GoPath = Join-Path ([Environment]::GetFolderPath("UserProfile")) "go\bin\ohfs.exe"
+                go install github.com/jurek-zsl/ohio-cli/cmd/ohio@latest
+                $GoPath = Join-Path ([Environment]::GetFolderPath("UserProfile")) "go\bin\ohio.exe"
                 if (Test-Path $GoPath) {
                     Copy-Item -Path $GoPath -Destination $OhioExe -Force
                     $Downloaded = $true
@@ -99,7 +99,7 @@ if ($LocalBinary) {
         Write-Host ""
         Write-Host "✖ Could not download or compile OhioCLI automatically." -ForegroundColor Red
         Write-Host "  Please ensure an internet connection is available or install via Go:" -ForegroundColor DarkGray
-        Write-Host "  go install github.com/jurek-zsl/ohio-cli/cmd/ohfs@latest" -ForegroundColor Cyan
+        Write-Host "  go install github.com/jurek-zsl/ohio-cli/cmd/ohio@latest" -ForegroundColor Cyan
         exit 1
     }
 }
@@ -118,7 +118,7 @@ if ($UserPath -notlike "*$InstallDir*") {
 Write-Host ""
 Write-Host "✔ Successfully installed OhioCLI!" -ForegroundColor Green
 Write-Host "  Location: $OhioExe (alias: ohfs.exe)"
-Write-Host "  Version:  v2.1.0"
+Write-Host "  Version:  v2.2.0"
 Write-Host ""
 Write-Host "Quick Start:" -ForegroundColor White
 Write-Host "  ohio tui              Launch interactive TUI dashboard" -ForegroundColor Cyan

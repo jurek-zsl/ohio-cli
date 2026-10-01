@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	Version        = "2.2.0"
 	DefaultApiUrl  = "https://api.ohiofiles.cloud"
 	ConfigDirName  = "ohio"
 	ConfigFileName = "config.json"
@@ -164,7 +165,7 @@ func (c *Config) ClearActiveSession() error {
 // ValidateSession returns an error if no session key is configured.
 func (c *Config) ValidateSession() error {
 	if strings.TrimSpace(c.SessionKey) == "" {
-		return errors.New("no active session configured; run 'ohfs session new' or 'ohfs session set <key>'")
+		return errors.New("no active session configured; run 'ohio session new' or 'ohio session set <key>'")
 	}
 	return nil
 }

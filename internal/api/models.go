@@ -64,6 +64,28 @@ func (f *FileItem) GetEffectiveSize() int64 {
 	return f.SizeBytes
 }
 
+// GetFileLocation returns a user-friendly folder location string for a file item.
+func GetFileLocation(f *FileItem) string {
+	if f == nil {
+		return "/ (root)"
+	}
+	if f.FolderName != nil && *f.FolderName != "" {
+		return "📁 " + *f.FolderName
+	}
+	if f.FolderPath != nil && *f.FolderPath != "" {
+		return "📁 " + *f.FolderPath
+	}
+	if f.FolderID != nil && *f.FolderID != "" {
+		return "📁 " + *f.FolderID
+	}
+	return "/ (root)"
+}
+
+// Location returns the user-friendly folder location string for this file item.
+func (f *FileItem) Location() string {
+	return GetFileLocation(f)
+}
+
 // FileListResponse is returned by GET /files.
 type FileListResponse struct {
 	Success    bool       `json:"success"`

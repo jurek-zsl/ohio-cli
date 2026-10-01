@@ -12,15 +12,16 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
-	"ohfs/internal/api"
-	"ohfs/internal/config"
-	"ohfs/internal/ui"
+	"ohio/internal/api"
+	"ohio/internal/config"
+	"ohio/internal/ui"
 )
 
 type tabIndex int
 
 const (
 	tabFiles tabIndex = iota
+	tabFolders
 	tabUpload
 	tabFeed
 	tabSession
@@ -32,12 +33,20 @@ type errMsg error
 type statusMsg string
 type clearStatusMsg struct{ id int }
 type filesLoadedMsg []api.FileItem
+type foldersLoadedMsg []api.FolderItem
+type folderCreatedMsg *api.FolderItem
+type folderDeletedMsg string
 type feedLoadedMsg []api.FileItem
 type sessionUpdatedMsg *api.PublicSession
+type uploadProgressMsg struct {
+	written, total int64
+	pct            float64
+	speed          string
+}
 type uploadDoneMsg *api.FileItem
 type downloadDoneMsg string
 
-// AppModel is the primary Bubble Tea model for the ohfs interactive dashboard.
+// AppModel is the primary Bubble Tea model for the ohio interactive dashboard.
 type AppModel struct {
 	cfg        *config.Config
 	client     *api.Client
@@ -57,6 +66,15 @@ type AppModel struct {
 	filesFiltering   bool
 	filesFilterInput textinput.Model
 
+	// Folders Explorer Tab
+	folders          []api.FolderItem
+	foldersCursor    int
+	foldersScroll    int
+	folderCreating   bool
+	folderNameInput  textinput.Model
+	folderFilterSlug string
+	folderFilterName string
+
 	// Public Feed Tab
 	feed            []api.FileItem
 	feedCursor      int
@@ -65,12 +83,15 @@ type AppModel struct {
 	feedFilterInput textinput.Model
 
 	// Quick Upload Tab
-	uploadInputs   []textinput.Model
-	uploadFocusIdx int
-	uploadPublic   bool
-	uploadOneTime  bool
-	uploading      bool
-	uploadProgress string
+	uploadInputs       []textinput.Model
+	uploadFocusIdx     int
+	uploadPublic       bool
+	uploadOneTime      bool
+	uploading          bool
+	uploadProgress     string
+	uploadProgressPct  float64
+	uploadProgressText string
+	uploadChan         chan tea.Msg
 
 	// Session Tab
 	sessionNicknameInput textinput.Model
@@ -119,6 +140,11 @@ func NewAppModel(cfg *config.Config, client *api.Client) AppModel {
 	filesFilter.CharLimit = 40
 	filesFilter.Width = 24
 
+	folderInput := textinput.New()
+	folderInput.Placeholder = "New folder name..."
+	folderInput.CharLimit = 64
+	folderInput.Width = 32
+
 	feedFilter := textinput.New()
 	feedFilter.Placeholder = "search public feed..."
 	feedFilter.CharLimit = 40
@@ -132,6 +158,7 @@ func NewAppModel(cfg *config.Config, client *api.Client) AppModel {
 		uploadInputs:         []textinput.Model{filePathInput, slugInput, pwdInput},
 		uploadPublic:         false,
 		uploadOneTime:        false,
+		folderNameInput:      folderInput,
 		sessionNicknameInput: nickInput,
 		filesFilterInput:     filesFilter,
 		feedFilterInput:      feedFilter,
@@ -143,6 +170,7 @@ func (m AppModel) Init() tea.Cmd {
 	return tea.Batch(
 		m.spinner.Tick,
 		m.loadFilesCmd(),
+		m.loadFoldersCmd(),
 		m.loadFeedCmd(),
 	)
 }
@@ -162,11 +190,37 @@ func (m AppModel) loadFilesCmd() tea.Cmd {
 		if m.cfg.SessionKey == "" {
 			return filesLoadedMsg([]api.FileItem{})
 		}
-		res, err := m.client.ListFiles(m.cfg.SessionKey, "", false, 1, 100)
+		res, err := m.client.ListFiles(m.cfg.SessionKey, m.folderFilterSlug, false, 1, 100)
 		if err != nil {
 			return errMsg(err)
 		}
 		return filesLoadedMsg(res.Files)
+	}
+}
+
+func (m AppModel) loadFoldersCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.cfg.SessionKey == "" {
+			return foldersLoadedMsg([]api.FolderItem{})
+		}
+		folders, err := m.client.ListFolders(m.cfg.SessionKey)
+		if err != nil {
+			return errMsg(err)
+		}
+		return foldersLoadedMsg(folders)
+	}
+}
+
+func waitForUploadMsg(ch chan tea.Msg) tea.Cmd {
+	return func() tea.Msg {
+		if ch == nil {
+			return nil
+		}
+		msg, ok := <-ch
+		if !ok {
+			return nil
+		}
+		return msg
 	}
 }
 
@@ -272,6 +326,32 @@ func (m *AppModel) syncFeedScroll(visibleRows int, totalItems int) {
 	}
 }
 
+func (m *AppModel) syncFoldersScroll(visibleRows int, totalItems int) {
+	if totalItems == 0 {
+		m.foldersCursor = 0
+		m.foldersScroll = 0
+		return
+	}
+	if m.foldersCursor < 0 {
+		m.foldersCursor = 0
+	}
+	if m.foldersCursor >= totalItems {
+		m.foldersCursor = totalItems - 1
+	}
+	if m.foldersCursor < m.foldersScroll {
+		m.foldersScroll = m.foldersCursor
+	}
+	if m.foldersCursor >= m.foldersScroll+visibleRows {
+		m.foldersScroll = m.foldersCursor - visibleRows + 1
+	}
+	if m.foldersScroll+visibleRows > totalItems && totalItems > visibleRows {
+		m.foldersScroll = totalItems - visibleRows
+	}
+	if m.foldersScroll < 0 {
+		m.foldersScroll = 0
+	}
+}
+
 func padCol(content string, width int) string {
 	return lipgloss.NewStyle().Width(width).MaxWidth(width).Render(content)
 }
@@ -304,6 +384,24 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		visibleRows := max(5, bodyHeight-7)
 		m.syncFilesScroll(visibleRows, len(m.getFilteredFiles()))
 
+	case foldersLoadedMsg:
+		m.folders = msg
+		m.loading = false
+		bodyHeight := max(10, m.height-6)
+		visibleRows := max(5, bodyHeight-7)
+		m.syncFoldersScroll(visibleRows, len(m.folders))
+
+	case folderCreatedMsg:
+		m.folderCreating = false
+		m.folderNameInput.SetValue("")
+		m.folderNameInput.Blur()
+		statusCmd := m.setStatus(fmt.Sprintf("Created folder %q", msg.Name), false)
+		return m, tea.Batch(statusCmd, m.loadFoldersCmd())
+
+	case folderDeletedMsg:
+		statusCmd := m.setStatus(fmt.Sprintf("Deleted folder %s", string(msg)), false)
+		return m, tea.Batch(statusCmd, m.loadFoldersCmd())
+
 	case feedLoadedMsg:
 		m.feed = msg
 		bodyHeight := max(10, m.height-6)
@@ -312,10 +410,28 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case sessionUpdatedMsg:
 		cmd := m.setStatus(fmt.Sprintf("Active session: %s (%s)", msg.Key, msg.Nickname), false)
-		cmds = append(cmds, cmd, m.loadFilesCmd())
+		cmds = append(cmds, cmd, m.loadFilesCmd(), m.loadFoldersCmd())
+
+	case uploadProgressMsg:
+		m.uploadProgressPct = msg.pct
+		speedStr := ""
+		if msg.speed != "" {
+			speedStr = " • " + msg.speed
+		}
+		if msg.total > 0 {
+			m.uploadProgressText = fmt.Sprintf("%s / %s (%.1f%%)%s", ui.FormatBytes(msg.written), ui.FormatBytes(msg.total), msg.pct*100, speedStr)
+		} else if msg.written > 0 {
+			m.uploadProgressText = fmt.Sprintf("%s uploaded%s", ui.FormatBytes(msg.written), speedStr)
+		} else {
+			m.uploadProgressText = "Preparing upload..."
+		}
+		return m, waitForUploadMsg(m.uploadChan)
 
 	case uploadDoneMsg:
 		m.uploading = false
+		m.uploadChan = nil
+		m.uploadProgressPct = 1.0
+		m.uploadProgressText = ""
 		statusCmd := m.setStatus(fmt.Sprintf("Uploaded successfully: %s", msg.URL), false)
 		m.uploadInputs[0].SetValue("")
 		m.uploadInputs[1].SetValue("")
@@ -331,6 +447,9 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		m.loading = false
 		m.uploading = false
+		m.uploadChan = nil
+		m.uploadProgressPct = 0
+		m.uploadProgressText = ""
 		cmds = append(cmds, m.setStatus(msg.Error(), true))
 
 	case tea.KeyMsg:
@@ -344,31 +463,34 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// When search filter is active on files/feed tabs, don't trigger global number switching
-		isFiltering := (m.activeTab == tabFiles && m.filesFiltering) || (m.activeTab == tabFeed && m.feedFiltering)
+		// When search filter is active on files/feed tabs or folder input is active, don't trigger global number switching
+		isFiltering := (m.activeTab == tabFiles && m.filesFiltering) || (m.activeTab == tabFeed && m.feedFiltering) || (m.activeTab == tabFolders && m.folderCreating)
 		if !isFiltering {
 			switch msg.String() {
 			case "ctrl+c":
 				return m, tea.Quit
 			case "tab":
-				m.activeTab = (m.activeTab + 1) % 5
+				m.activeTab = (m.activeTab + 1) % 6
 				return m, nil
 			case "shift+tab":
-				m.activeTab = (m.activeTab + 4) % 5
+				m.activeTab = (m.activeTab + 5) % 6
 				return m, nil
 			case "1":
 				m.activeTab = tabFiles
 				return m, nil
 			case "2":
-				m.activeTab = tabUpload
+				m.activeTab = tabFolders
 				return m, nil
 			case "3":
-				m.activeTab = tabFeed
+				m.activeTab = tabUpload
 				return m, nil
 			case "4":
-				m.activeTab = tabSession
+				m.activeTab = tabFeed
 				return m, nil
 			case "5":
+				m.activeTab = tabSession
+				return m, nil
+			case "6":
 				m.activeTab = tabHelp
 				return m, nil
 			}
@@ -378,6 +500,8 @@ func (m AppModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.activeTab {
 		case tabFiles:
 			return m.updateFilesTab(msg)
+		case tabFolders:
+			return m.updateFoldersTab(msg)
 		case tabUpload:
 			return m.updateUploadTab(msg)
 		case tabFeed:
@@ -499,6 +623,13 @@ func (m AppModel) updateFilesTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			})
 		}
 	case "esc":
+		if m.folderFilterSlug != "" {
+			m.folderFilterSlug = ""
+			m.folderFilterName = ""
+			m.loading = true
+			cmd := m.setStatus("Cleared folder filter", false)
+			return m, tea.Batch(cmd, m.loadFilesCmd())
+		}
 		if m.filesFilterInput.Value() != "" {
 			m.filesFilterInput.SetValue("")
 			m.syncFilesScroll(visibleRows, len(m.getFilteredFiles()))
@@ -507,6 +638,121 @@ func (m AppModel) updateFilesTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q":
 		return m, tea.Quit
 	}
+	return m, nil
+}
+
+func (m AppModel) updateFoldersTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	bodyHeight := max(10, m.height-6)
+	visibleRows := max(5, bodyHeight-7)
+
+	if m.folderCreating {
+		switch msg.String() {
+		case "esc":
+			m.folderCreating = false
+			m.folderNameInput.SetValue("")
+			m.folderNameInput.Blur()
+			return m, nil
+		case "enter":
+			folderName := strings.TrimSpace(m.folderNameInput.Value())
+			if folderName == "" {
+				cmd := m.setStatus("Folder name cannot be empty", true)
+				return m, cmd
+			}
+			m.folderCreating = false
+			m.folderNameInput.Blur()
+			statusCmd := m.setStatus(fmt.Sprintf("Creating folder %q...", folderName), false)
+			return m, tea.Batch(statusCmd, func() tea.Msg {
+				item, err := m.client.CreateFolder(folderName, "", m.cfg.SessionKey, false)
+				if err != nil {
+					return errMsg(err)
+				}
+				return folderCreatedMsg(item)
+			})
+		default:
+			var cmd tea.Cmd
+			m.folderNameInput, cmd = m.folderNameInput.Update(msg)
+			return m, cmd
+		}
+	}
+
+	switch msg.String() {
+	case "up", "k":
+		if m.foldersCursor > 0 {
+			m.foldersCursor--
+			m.syncFoldersScroll(visibleRows, len(m.folders))
+		}
+	case "down", "j":
+		if m.foldersCursor < len(m.folders)-1 {
+			m.foldersCursor++
+			m.syncFoldersScroll(visibleRows, len(m.folders))
+		}
+	case "g":
+		m.foldersCursor = 0
+		m.syncFoldersScroll(visibleRows, len(m.folders))
+	case "G":
+		if len(m.folders) > 0 {
+			m.foldersCursor = len(m.folders) - 1
+			m.syncFoldersScroll(visibleRows, len(m.folders))
+		}
+	case "n":
+		m.folderCreating = true
+		m.folderNameInput.SetValue("")
+		m.folderNameInput.Focus()
+		return m, nil
+	case "enter":
+		if len(m.folders) > 0 && m.foldersCursor < len(m.folders) {
+			fld := m.folders[m.foldersCursor]
+			m.folderFilterSlug = fld.Slug
+			if m.folderFilterSlug == "" {
+				m.folderFilterSlug = fld.ID
+			}
+			m.folderFilterName = fld.Name
+			m.activeTab = tabFiles
+			m.loading = true
+			cmd := m.setStatus(fmt.Sprintf("Filtered files by folder %q", fld.Name), false)
+			return m, tea.Batch(cmd, m.loadFilesCmd())
+		}
+	case "z":
+		if len(m.folders) > 0 && m.foldersCursor < len(m.folders) {
+			fld := m.folders[m.foldersCursor]
+			targetName := fld.Slug
+			if targetName == "" {
+				targetName = fld.ID
+			}
+			outputPath := fmt.Sprintf("folder-%s.zip", targetName)
+			statusCmd := m.setStatus(fmt.Sprintf("Downloading folder %q as ZIP...", fld.Name), false)
+			return m, tea.Batch(statusCmd, func() tea.Msg {
+				idOrSlug := fld.ID
+				if idOrSlug == "" {
+					idOrSlug = fld.Slug
+				}
+				err := m.client.DownloadFolderZip(idOrSlug, outputPath, nil)
+				if err != nil {
+					return errMsg(err)
+				}
+				return downloadDoneMsg(fmt.Sprintf("Downloaded %s to current directory", outputPath))
+			})
+		}
+	case "x":
+		if len(m.folders) > 0 && m.foldersCursor < len(m.folders) {
+			fld := m.folders[m.foldersCursor]
+			statusCmd := m.setStatus(fmt.Sprintf("Deleting folder %q...", fld.Name), false)
+			return m, tea.Batch(statusCmd, func() tea.Msg {
+				err := m.client.DeleteFolder(fld.ID, m.cfg.SessionKey)
+				if err != nil {
+					return errMsg(err)
+				}
+				return folderDeletedMsg(fld.Name)
+			})
+		}
+	case "r":
+		m.loading = true
+		cmd := m.setStatus("Refreshing folders...", false)
+		return m, tea.Batch(cmd, m.loadFoldersCmd())
+	case "q":
+		return m, tea.Quit
+	}
+
 	return m, nil
 }
 
@@ -656,12 +902,18 @@ func (m AppModel) updateUploadTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				cmd := m.setStatus("Please enter a valid file path", true)
 				return m, cmd
 			}
-			if _, err := os.Stat(filePath); err != nil {
+			fi, err := os.Stat(filePath)
+			if err != nil {
 				cmd := m.setStatus(fmt.Sprintf("File not found: %s", filePath), true)
 				return m, cmd
 			}
 
 			m.uploading = true
+			ch := make(chan tea.Msg, 50)
+			m.uploadChan = ch
+			m.uploadProgressPct = 0
+			m.uploadProgressText = "Preparing upload..."
+
 			statusCmd := m.setStatus("Uploading file to OhioFiles...", false)
 
 			opts := api.UploadOptions{
@@ -673,15 +925,100 @@ func (m AppModel) updateUploadTab(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				DeviceId:   m.cfg.DeviceId,
 			}
 
-			uploadCmd := func() tea.Msg {
-				file, err := m.client.Upload(filePath, opts, nil, nil)
-				if err != nil {
-					return errMsg(err)
-				}
-				return uploadDoneMsg(file)
-			}
+			client := m.client
+			fileSize := fi.Size()
 
-			return m, tea.Batch(statusCmd, uploadCmd)
+			go func() {
+				defer close(ch)
+
+				var lastBytes int64
+				var lastTime = time.Now()
+				var currSpeed float64
+
+				onDirect := func(written, total int64) {
+					if total <= 0 {
+						total = fileSize
+					}
+					now := time.Now()
+					dt := now.Sub(lastTime).Seconds()
+					if dt >= 0.15 {
+						db := float64(written - lastBytes)
+						if dt > 0 {
+							instantSpeed := db / dt
+							if currSpeed == 0 {
+								currSpeed = instantSpeed
+							} else {
+								currSpeed = currSpeed*0.65 + instantSpeed*0.35
+							}
+						}
+						lastBytes = written
+						lastTime = now
+					}
+
+					var pct float64
+					if total > 0 {
+						pct = float64(written) / float64(total)
+						if pct > 1.0 {
+							pct = 1.0
+						}
+					}
+					speedStr := ""
+					if currSpeed > 0 {
+						speedStr = fmt.Sprintf("%s/s", ui.FormatBytes(int64(currSpeed)))
+					}
+
+					select {
+					case ch <- uploadProgressMsg{written: written, total: total, pct: pct, speed: speedStr}:
+					default:
+					}
+				}
+
+				onChunk := func(chunk, totalChunks int) {
+					total := fileSize
+					var written int64
+					var pct float64
+					if totalChunks > 0 {
+						pct = float64(chunk) / float64(totalChunks)
+						if pct > 1.0 {
+							pct = 1.0
+						}
+						written = int64(pct * float64(total))
+					}
+					now := time.Now()
+					dt := now.Sub(lastTime).Seconds()
+					if dt >= 0.15 {
+						db := float64(written - lastBytes)
+						if dt > 0 {
+							instantSpeed := db / dt
+							if currSpeed == 0 {
+								currSpeed = instantSpeed
+							} else {
+								currSpeed = currSpeed*0.65 + instantSpeed*0.35
+							}
+						}
+						lastBytes = written
+						lastTime = now
+					}
+					speedStr := ""
+					if currSpeed > 0 {
+						speedStr = fmt.Sprintf("%s/s", ui.FormatBytes(int64(currSpeed)))
+					}
+
+					select {
+					case ch <- uploadProgressMsg{written: written, total: total, pct: pct, speed: speedStr}:
+					default:
+					}
+				}
+
+				file, err := client.Upload(filePath, opts, onDirect, onChunk)
+				if err != nil {
+					ch <- errMsg(err)
+					return
+				}
+				ch <- uploadDoneMsg(file)
+			}()
+
+			return m, tea.Batch(statusCmd, waitForUploadMsg(ch))
 		}
 	}
 
@@ -791,6 +1128,8 @@ func (m AppModel) View() string {
 		switch m.activeTab {
 		case tabFiles:
 			body = m.renderFilesView(bodyHeight)
+		case tabFolders:
+			body = m.renderFoldersView(bodyHeight)
 		case tabUpload:
 			body = m.renderUploadView()
 		case tabFeed:
@@ -812,7 +1151,7 @@ func (m AppModel) View() string {
 }
 
 func (m AppModel) renderTopBar() string {
-	logo := ui.TopBarBulletStyle.Render("◆") + " " + ui.TopBarLogoStyle.Render("ohfs") + " " + ui.TopBarVersionStyle.Render("v1.0")
+	logo := ui.TopBarBulletStyle.Render("◆") + " " + ui.TopBarLogoStyle.Render("ohio") + " " + ui.TopBarVersionStyle.Render("v"+config.Version)
 
 	sessionText := "Session: None"
 	if m.cfg.SessionKey != "" {
@@ -838,10 +1177,11 @@ func (m AppModel) renderTopBar() string {
 func (m AppModel) renderTabs() string {
 	tabs := []string{
 		"1 Files",
-		"2 Upload",
-		"3 Feed",
-		"4 Session",
-		"5 Help",
+		"2 Folders",
+		"3 Upload",
+		"4 Feed",
+		"5 Session",
+		"6 Help",
 	}
 
 	var renderedTabs []string
@@ -859,7 +1199,7 @@ func (m AppModel) renderFilesView(bodyHeight int) string {
 	if m.cfg.SessionKey == "" {
 		return ui.BoxCardStyle.Render(
 			ui.StatusWarningStyle.Render("No active session configured!\n\n") +
-				ui.DescHelpStyle.Render("Press '4' to switch to Session and generate a memorable or secure key."),
+				ui.DescHelpStyle.Render("Press '5' to switch to Session and generate a memorable or secure key."),
 		)
 	}
 
@@ -868,9 +1208,20 @@ func (m AppModel) renderFilesView(bodyHeight int) string {
 	totalFiltered := len(items)
 
 	if totalAll == 0 {
+		if m.folderFilterSlug != "" {
+			folderName := m.folderFilterName
+			if folderName == "" {
+				folderName = m.folderFilterSlug
+			}
+			return ui.BoxCardStyle.Render(
+				ui.TitleStyle.Render("📁 Workspace Files") + "  " +
+					ui.PillSessionStyle.Render(fmt.Sprintf("Filter: 📁 %s (Esc to clear)", folderName)) + "\n\n" +
+					ui.DescHelpStyle.Render(fmt.Sprintf("No files found in folder %q.\nPress 'Esc' to clear folder filter.", folderName)),
+			)
+		}
 		return ui.BoxCardStyle.Render(
 			ui.TitleStyle.Render("📁 Workspace Files\n\n") +
-				ui.DescHelpStyle.Render("No files in this session yet.\nPress 'u' or go to [2] Quick Upload to share your first file!"),
+				ui.DescHelpStyle.Render("No files in this session yet.\nPress 'u' or go to [3] Quick Upload to share your first file!"),
 		)
 	}
 
@@ -881,6 +1232,13 @@ func (m AppModel) renderFilesView(bodyHeight int) string {
 	counterBadge := ui.DescHelpStyle.Render(fmt.Sprintf("[%d/%d files]", m.filesCursor+1, totalFiltered))
 	if m.filesFilterInput.Value() != "" {
 		counterBadge = ui.PillSessionStyle.Render(fmt.Sprintf("Filter: %q (%d/%d)", m.filesFilterInput.Value(), totalFiltered, totalAll))
+	}
+	if m.folderFilterSlug != "" {
+		folderName := m.folderFilterName
+		if folderName == "" {
+			folderName = m.folderFilterSlug
+		}
+		counterBadge += "  " + ui.PillSessionStyle.Render(fmt.Sprintf("Filter: 📁 %s (Esc to clear)", folderName))
 	}
 
 	// Scroll arrows
@@ -899,19 +1257,28 @@ func (m AppModel) renderFilesView(bodyHeight int) string {
 	headerLine := title + "  " + counterBadge
 	if m.filesFiltering {
 		headerLine = title + "  " + ui.KeyHelpStyle.Render("Search: ") + m.filesFilterInput.View() + " " + ui.DescHelpStyle.Render("(Esc to close)")
+		if m.folderFilterSlug != "" {
+			folderName := m.folderFilterName
+			if folderName == "" {
+				folderName = m.folderFilterSlug
+			}
+			headerLine += "  " + ui.PillSessionStyle.Render(fmt.Sprintf("Filter: 📁 %s (Esc to clear)", folderName))
+		}
 	}
 	b.WriteString(headerLine + "\n\n")
 
 	// Table Headers
 	contentWidth := max(70, m.width-8)
-	nameWidth := max(22, contentWidth-56)
+	locWidth := 14
+	nameWidth := max(18, contentWidth-56-locWidth)
 	hdrName := padCol("NAME", nameWidth)
+	hdrLoc := padCol("LOCATION", locWidth)
 	hdrSlug := padCol("SLUG", 12)
 	hdrSize := padCol("SIZE", 9)
 	hdrVis := padCol("VISIBILITY", 14)
 	hdrDls := padCol("DLS", 6)
 	hdrTime := padCol("UPLOADED", 11)
-	headerText := fmt.Sprintf("  %s %s %s %s %s %s", hdrName, hdrSlug, hdrSize, hdrVis, hdrDls, hdrTime)
+	headerText := fmt.Sprintf("  %s %s %s %s %s %s %s", hdrName, hdrLoc, hdrSlug, hdrSize, hdrVis, hdrDls, hdrTime)
 	b.WriteString(ui.TableHeaderStyle.Render(headerText) + "\n")
 
 	if totalFiltered == 0 {
@@ -944,13 +1311,14 @@ func (m AppModel) renderFilesView(bodyHeight int) string {
 			}
 
 			colName := padCol(ui.TruncateString(f.Filename, nameWidth), nameWidth)
+			colLoc := padCol(ui.TruncateString(api.GetFileLocation(&f), locWidth), locWidth)
 			colSlug := padCol(ui.TruncateString(f.Slug, 12), 12)
 			colSize := padCol(ui.FormatBytes(f.GetEffectiveSize()), 9)
 			colVis := padCol(visBadge, 14)
 			colDls := padCol(fmt.Sprintf("%d", f.Downloads), 6)
 			colTime := padCol(ui.FormatRelativeTime(f.UploadedAt), 11)
 
-			rowLine := fmt.Sprintf("%s %s %s %s %s %s", colName, colSlug, colSize, colVis, colDls, colTime)
+			rowLine := fmt.Sprintf("%s %s %s %s %s %s %s", colName, colLoc, colSlug, colSize, colVis, colDls, colTime)
 
 			if idx == m.filesCursor {
 				b.WriteString(ui.TableSelectedRowStyle.Render("▸ "+rowLine) + "\n")
@@ -971,6 +1339,119 @@ func (m AppModel) renderFilesView(bodyHeight int) string {
 	// Navigation shortcuts hint
 	hint := ui.KeyHelpStyle.Render("Keys: ") +
 		ui.DescHelpStyle.Render("[↑/↓] Move  •  [/] Filter  •  [d] Download  •  [s/Enter] Share/QR  •  [x] Delete  •  [r] Refresh  •  [u] Upload")
+	b.WriteString(hint)
+
+	return ui.BoxCardStyle.Render(b.String())
+}
+
+func (m AppModel) renderFoldersView(bodyHeight int) string {
+	if m.cfg.SessionKey == "" {
+		return ui.BoxCardStyle.Render(
+			ui.StatusWarningStyle.Render("No active session configured!\n\n") +
+				ui.DescHelpStyle.Render("Press '5' to switch to Session and generate a memorable or secure key."),
+		)
+	}
+
+	totalAll := len(m.folders)
+	visibleRows := max(5, bodyHeight-7)
+
+	var b strings.Builder
+
+	// Top Title + Counter Badge
+	title := ui.TitleStyle.Render("📁 Session Folders")
+	counterBadge := ui.DescHelpStyle.Render(fmt.Sprintf("[%d/%d folders]", m.foldersCursor+1, totalAll))
+	if totalAll == 0 {
+		counterBadge = ui.DescHelpStyle.Render("[0 folders]")
+	}
+
+	// Scroll arrows
+	arrows := ""
+	if m.foldersScroll > 0 {
+		arrows += "▲ "
+	}
+	if m.foldersScroll+visibleRows < totalAll {
+		arrows += "▼"
+	}
+	if arrows != "" {
+		counterBadge += " " + ui.KeyHelpStyle.Render(arrows)
+	}
+
+	headerLine := title + "  " + counterBadge
+	if m.folderCreating {
+		headerLine = title + "  " + ui.KeyHelpStyle.Render("New Folder: ") + m.folderNameInput.View() + " " + ui.DescHelpStyle.Render("(Enter to create, Esc to cancel)")
+	}
+	b.WriteString(headerLine + "\n\n")
+
+	if m.folderCreating {
+		b.WriteString("  " + ui.KeyHelpStyle.Render("Folder Name: ") + m.folderNameInput.View() + "  " + ui.DescHelpStyle.Render("[Enter: Submit, Esc: Cancel]") + "\n\n")
+	}
+
+	// Table Headers
+	contentWidth := max(70, m.width-8)
+	nameWidth := max(22, contentWidth-52)
+	hdrName := padCol("NAME", nameWidth)
+	hdrSlug := padCol("SLUG", 16)
+	hdrVis := padCol("VISIBILITY", 12)
+	hdrTime := padCol("CREATED", 14)
+	headerText := fmt.Sprintf("  %s %s %s %s", hdrName, hdrSlug, hdrVis, hdrTime)
+	b.WriteString(ui.TableHeaderStyle.Render(headerText) + "\n")
+
+	if totalAll == 0 {
+		if !m.folderCreating {
+			b.WriteString(ui.DescHelpStyle.Render("\n  No folders in this session yet.\n  Press 'n' to create your first folder!\n"))
+		} else {
+			b.WriteString(ui.DescHelpStyle.Render("\n  Enter folder name above and press Enter.\n"))
+		}
+	} else {
+		end := min(totalAll, m.foldersScroll+visibleRows)
+		start := m.foldersScroll
+		if start < 0 {
+			start = 0
+		}
+		if start >= totalAll {
+			start = max(0, totalAll-1)
+		}
+		if end < start {
+			end = start
+		}
+
+		for idx := start; idx < end; idx++ {
+			fld := m.folders[idx]
+
+			visBadge := ui.PillPrivateStyle.Render("PRIVATE")
+			if fld.IsPublic {
+				visBadge = ui.PillPublicStyle.Render("PUBLIC")
+			}
+
+			colName := padCol(ui.TruncateString("📁 "+fld.Name, nameWidth), nameWidth)
+			colSlug := padCol(ui.TruncateString(fld.Slug, 16), 16)
+			colVis := padCol(visBadge, 12)
+			colTime := padCol(ui.FormatRelativeTime(fld.CreatedAt), 14)
+
+			rowLine := fmt.Sprintf("%s %s %s %s", colName, colSlug, colVis, colTime)
+
+			if idx == m.foldersCursor {
+				b.WriteString(ui.TableSelectedRowStyle.Render("▸ "+rowLine) + "\n")
+			} else {
+				b.WriteString(ui.TableRowStyle.Render("  "+rowLine) + "\n")
+			}
+		}
+	}
+
+	// Bottom Scroll Indicator
+	if m.foldersScroll+visibleRows < totalAll {
+		remaining := totalAll - (m.foldersScroll + visibleRows)
+		b.WriteString(ui.DescHelpStyle.Render(fmt.Sprintf("  ▼ %d more folders below\n", remaining)))
+	} else {
+		b.WriteString("\n")
+	}
+
+	// Navigation shortcuts hint
+	hint := ui.KeyHelpStyle.Render("Keys: ") +
+		ui.DescHelpStyle.Render("[↑/↓] Move  •  [Enter] Filter Files  •  [n] New Folder  •  [z] Download ZIP  •  [x] Delete  •  [r] Refresh")
+	if m.folderCreating {
+		hint = ui.KeyHelpStyle.Render("Keys: ") + ui.DescHelpStyle.Render("[Enter] Confirm Creation  •  [Esc] Cancel")
+	}
 	b.WriteString(hint)
 
 	return ui.BoxCardStyle.Render(b.String())
@@ -1134,7 +1615,35 @@ func (m AppModel) renderUploadView() string {
 		btnStyle = ui.TabActiveStyle
 	}
 	if m.uploading {
-		b.WriteString("  " + ui.LivePulseStyle.Render(m.spinner.View()+" Uploading file to OhioFiles... [████████████░░░░]") + "\n\n")
+		barWidth := 24
+		pct := m.uploadProgressPct
+		if pct < 0 {
+			pct = 0
+		}
+		if pct > 1 {
+			pct = 1
+		}
+		filled := int(pct * float64(barWidth))
+		empty := barWidth - filled
+		fillStr := strings.Repeat("━", filled)
+		fillStyled := lipgloss.NewStyle().Foreground(ui.ColorCyanBright).Render(fillStr)
+		head := ""
+		if filled > 0 && filled < barWidth {
+			head = lipgloss.NewStyle().Foreground(ui.ColorEmeraldAccent).Render("╸")
+			empty--
+		}
+		if empty < 0 {
+			empty = 0
+		}
+		emptyStr := strings.Repeat("━", empty)
+		emptyStyled := lipgloss.NewStyle().Foreground(lipgloss.Color("#27272a")).Render(emptyStr)
+
+		bar := fmt.Sprintf("[%s%s%s] %5.1f%%", fillStyled, head, emptyStyled, pct*100)
+		txt := m.uploadProgressText
+		if txt == "" {
+			txt = "Preparing upload..."
+		}
+		b.WriteString("  " + m.spinner.View() + " " + ui.TitleStyle.Render("Uploading:") + " " + bar + "  " + ui.DescHelpStyle.Render(txt) + "\n\n")
 	} else {
 		b.WriteString("  " + btnStyle.Render(" [ Upload File (Enter) ] ") + "\n\n")
 	}
@@ -1159,7 +1668,7 @@ func (m AppModel) renderSessionView() string {
 	if slug == "" {
 		slug = "<none>"
 	}
-	profileURL := fmt.Sprintf("https://ohfs.app/p/%s", slug)
+	profileURL := fmt.Sprintf("%s/profiles/%s", ui.ResolveWebRoot(m.cfg.ResolveApiUrl()), slug)
 	if slug == "<none>" {
 		profileURL = "<no public profile>"
 	}
@@ -1189,7 +1698,7 @@ func (m AppModel) renderSessionView() string {
 func (m AppModel) renderHelpView() string {
 	col1Header := ui.TitleStyle.Render("DASHBOARD SHORTCUTS")
 	col1 := col1Header + "\n\n" +
-		ui.KeyHelpStyle.Render("  [Tab] / [1-5]   ") + ui.DescHelpStyle.Render("Switch active tabs") + "\n" +
+		ui.KeyHelpStyle.Render("  [Tab] / [1-6]   ") + ui.DescHelpStyle.Render("Switch active tabs") + "\n" +
 		ui.KeyHelpStyle.Render("  [↑/↓] or [j/k]  ") + ui.DescHelpStyle.Render("Navigate items & rows") + "\n" +
 		ui.KeyHelpStyle.Render("  [/]             ") + ui.DescHelpStyle.Render("Search & filter files") + "\n" +
 		ui.KeyHelpStyle.Render("  [s] / [Enter]   ") + ui.DescHelpStyle.Render("Share file & view QR code") + "\n" +
@@ -1202,15 +1711,15 @@ func (m AppModel) renderHelpView() string {
 
 	col2Header := ui.TitleStyle.Render("CLI COMMAND REFERENCE")
 	col2 := col2Header + "\n\n" +
-		ui.KeyHelpStyle.Render("  ohfs upload <file>       ") + ui.DescHelpStyle.Render("Upload with progress bar") + "\n" +
-		ui.KeyHelpStyle.Render("  ohfs upload -p -o <file> ") + ui.DescHelpStyle.Render("Public & one-time upload") + "\n" +
-		ui.KeyHelpStyle.Render("  ohfs ls [--public]       ") + ui.DescHelpStyle.Render("List session or public files") + "\n" +
-		ui.KeyHelpStyle.Render("  ohfs download <slug>     ") + ui.DescHelpStyle.Render("Download with range resume") + "\n" +
-		ui.KeyHelpStyle.Render("  ohfs share <slug>        ") + ui.DescHelpStyle.Render("Direct URL & ASCII QR code") + "\n" +
-		ui.KeyHelpStyle.Render("  ohfs session new         ") + ui.DescHelpStyle.Render("Create memorable session") + "\n" +
-		ui.KeyHelpStyle.Render("  ohfs session new --sec   ") + ui.DescHelpStyle.Render("Create cryptographic key") + "\n" +
-		ui.KeyHelpStyle.Render("  ohfs session whoami      ") + ui.DescHelpStyle.Render("Inspect active identity") + "\n" +
-		ui.KeyHelpStyle.Render("  ohfs folder zip <id>     ") + ui.DescHelpStyle.Render("Stream folder as ZIP")
+		ui.KeyHelpStyle.Render("  ohio upload <file>       ") + ui.DescHelpStyle.Render("Upload with progress bar") + "\n" +
+		ui.KeyHelpStyle.Render("  ohio upload -p -o <file> ") + ui.DescHelpStyle.Render("Public & one-time upload") + "\n" +
+		ui.KeyHelpStyle.Render("  ohio ls [--public]       ") + ui.DescHelpStyle.Render("List session or public files") + "\n" +
+		ui.KeyHelpStyle.Render("  ohio download <slug>     ") + ui.DescHelpStyle.Render("Download with range resume") + "\n" +
+		ui.KeyHelpStyle.Render("  ohio share <slug>        ") + ui.DescHelpStyle.Render("Direct URL & ASCII QR code") + "\n" +
+		ui.KeyHelpStyle.Render("  ohio session new         ") + ui.DescHelpStyle.Render("Create memorable session") + "\n" +
+		ui.KeyHelpStyle.Render("  ohio session new --sec   ") + ui.DescHelpStyle.Render("Create cryptographic key") + "\n" +
+		ui.KeyHelpStyle.Render("  ohio session whoami      ") + ui.DescHelpStyle.Render("Inspect active identity") + "\n" +
+		ui.KeyHelpStyle.Render("  ohio folder zip <id>     ") + ui.DescHelpStyle.Render("Stream folder as ZIP")
 
 	col1Width := min(44, max(36, (m.width-12)/2))
 	col2Width := min(52, max(40, (m.width-12)/2))
@@ -1238,7 +1747,7 @@ func (m AppModel) renderModal() string {
 
 func (m AppModel) renderStatusBar() string {
 	if m.statusText == "" {
-		return ui.DescHelpStyle.Render(" [Tab] Switch tabs  •  [1-5] Jump  •  [/] Filter  •  [q] Quit")
+		return ui.DescHelpStyle.Render(" [Tab] Switch tabs  •  [1-6] Jump  •  [/] Filter  •  [q] Quit")
 	}
 
 	if m.statusErr {

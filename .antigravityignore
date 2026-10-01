@@ -1,0 +1,52 @@
+# Antigravity Context Exclusion File
+
+# VCS & Environment
+.git/
+.gitignore
+.env*
+!.env.example
+
+# Dependencies & Package Managers
+node_modules/
+vendor/
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Build Artifacts, Bundles & Compilations
+dist/
+build/
+out/
+target/
+*.min.js
+*.min.css
+*.map
+
+# Logs, Diagnostics & Temp Storage
+logs/
+*.log
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+.turbo/
+
+# OS Metadata
+.DS_Store
+Thumbs.db
+
+# Storage, Uploads & Databases
+*.sqlite
+*.sqlite3
+*.db
+uploads/
+storage/
+
+# Heavy Assets & Binaries
+*.tar
+*.gz
+*.zip
+*.bin
+*.exe
+*.iso

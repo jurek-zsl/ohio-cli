@@ -72,7 +72,7 @@ else
   # Remote release download
   CANDIDATE_URLS=(
     "https://github.com/jurek-zsl/ohio-cli/releases/latest/download/ohio-${OS}-${ARCH_TARGET}"
-    "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.1.0/ohio-${OS}-${ARCH_TARGET}"
+    "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.2.0/ohio-${OS}-${ARCH_TARGET}"
     "https://api.ohiofiles.cloud/releases/latest/ohio-${OS}-${ARCH_TARGET}"
   )
   DOWNLOADED=0
@@ -91,8 +91,8 @@ else
     # Fallback to Go build if installed
     if command -v go >/dev/null 2>&1; then
       echo -e "  ${GRAY}• Remote binary unavailable, compiling using Go...${RESET}"
-      if go install github.com/jurek-zsl/ohio-cli/cmd/ohfs@latest 2>/dev/null; then
-        GOBIN_SRC="$(go env GOPATH)/bin/ohfs"
+      if go install github.com/jurek-zsl/ohio-cli/cmd/ohio@latest 2>/dev/null; then
+        GOBIN_SRC="$(go env GOPATH)/bin/ohio"
         if [ -f "$GOBIN_SRC" ]; then
           cp -f "$GOBIN_SRC" "$INSTALL_DIR/ohio"
           DOWNLOADED=1
@@ -103,7 +103,7 @@ else
 
   if [ "$DOWNLOADED" -eq 0 ]; then
     echo -e "${RED}✖ Failed downloading or compiling OhioCLI.${RESET}"
-    echo -e "  Install with Go: go install github.com/jurek-zsl/ohio-cli/cmd/ohfs@latest"
+    echo -e "  Install with Go: go install github.com/jurek-zsl/ohio-cli/cmd/ohio@latest"
     exit 1
   fi
 fi
@@ -121,7 +121,7 @@ fi
 
 echo -e "\n${GREEN}${BOLD}✔ Successfully installed OhioCLI!${RESET}"
 echo -e "  Command:  ${CYAN}${INSTALL_DIR}/ohio${RESET} (alias: ${CYAN}ohfs${RESET})"
-echo -e "  Version:  ${BOLD}v2.1.0${RESET}"
+echo -e "  Version:  ${BOLD}v2.2.0${RESET}"
 echo -e "\n${BOLD}Quick Start:${RESET}"
 echo -e "  ${CYAN}ohio tui${RESET}              Launch full-screen interactive dashboard"
 echo -e "  ${CYAN}ohio -u file.txt${RESET}      Instantly upload a file"

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"ohfs/internal/api"
+	"ohio/internal/api"
 )
 
 var (
@@ -75,12 +75,8 @@ func RenderUploadCard(f *api.FileItem, duration time.Duration, showQR bool) stri
 	}
 	b.WriteString(FormatKV("Visibility", strings.Join(badges, CardDotStyle.Render("  •  "))) + "\n")
 
-	// Folder if assigned
-	if f.FolderName != nil && *f.FolderName != "" {
-		b.WriteString(FormatKV("Folder", CardValueStyle.Render(*f.FolderName)) + "\n")
-	} else if f.FolderID != nil && *f.FolderID != "" {
-		b.WriteString(FormatKV("Folder", CardValueStyle.Render(*f.FolderID)) + "\n")
-	}
+	// Location
+	b.WriteString(FormatKV("Location", CardValueStyle.Render(api.GetFileLocation(f))) + "\n")
 
 	// Markdown Embed: ![[ohiofile:my-slug]]
 	b.WriteString(FormatKV("Markdown", CardMarkdownStyle.Render(fmt.Sprintf("![[ohiofile:%s]]", f.Slug))) + "\n")
@@ -104,16 +100,13 @@ func RenderUploadCard(f *api.FileItem, duration time.Duration, showQR bool) stri
 // RenderDownloadSuccess formats the download completion output.
 func RenderDownloadSuccess(filename string, size int64, destPath string, duration time.Duration) string {
 	check := CardCheckmarkStyle.Render("✔")
-	fileText := TitleStyle.Render("Downloaded " + filename)
+	title := TitleStyle.Render("Downloaded " + filename)
 	sizeText := CardDimmedStyle.Render("(" + FormatBytes(size) + ")")
 	durText := CardDimmedStyle.Render("in " + FormatDurationShort(duration))
-
-	return fmt.Sprintf("%s %s %s to %s %s",
-		check,
-		fileText,
-		sizeText,
-		CardValueStyle.Render(destPath),
-		durText,
+	return fmt.Sprintf("%s %s %s %s\n%s\n%s",
+		check, title, sizeText, durText,
+		FormatKV("Destination", CardValueStyle.Render(destPath)),
+		FormatKV("Size", CardValueStyle.Render(FormatBytes(size))),
 	)
 }
 
@@ -224,19 +217,13 @@ func RenderFolderCard(folder *api.FolderItem, title string) string {
 // RenderFolderZipSuccess formats folder archive download completion.
 func RenderFolderZipSuccess(archivePath string, size int64, duration time.Duration) string {
 	check := CardCheckmarkStyle.Render("✔")
-	actionText := TitleStyle.Render("Downloaded archive")
-	var sizeText string
-	if size > 0 {
-		sizeText = " " + CardDimmedStyle.Render("("+FormatBytes(size)+")")
-	}
+	title := TitleStyle.Render("Downloaded archive")
+	sizeText := CardDimmedStyle.Render("(" + FormatBytes(size) + ")")
 	durText := CardDimmedStyle.Render("in " + FormatDurationShort(duration))
-
-	return fmt.Sprintf("%s %s%s to %s %s",
-		check,
-		actionText,
-		sizeText,
-		CardValueStyle.Render(archivePath),
-		durText,
+	return fmt.Sprintf("%s %s %s %s\n%s\n%s",
+		check, title, sizeText, durText,
+		FormatKV("Archive", CardValueStyle.Render(archivePath)),
+		FormatKV("Size", CardValueStyle.Render(FormatBytes(size))),
 	)
 }
 
@@ -246,7 +233,7 @@ func RenderDeleteSuccess(itemType, idOrSlug string) string {
 	return fmt.Sprintf("%s %s %s", check, TitleStyle.Render(fmt.Sprintf("Deleted %s:", itemType)), CardDimmedStyle.Render(idOrSlug))
 }
 
-// RenderInfoCard renders file details for ohfs info.
+// RenderInfoCard renders file details for ohio info.
 func RenderInfoCard(f *api.FileItem) string {
 	var b strings.Builder
 
@@ -259,6 +246,7 @@ func RenderInfoCard(f *api.FileItem) string {
 
 	b.WriteString(FormatKV("Link", CardLinkStyle.Render(linkURL)) + "\n")
 	b.WriteString(FormatKV("Slug", CardValueStyle.Render(f.Slug)) + "\n")
+	b.WriteString(FormatKV("Location", CardValueStyle.Render(api.GetFileLocation(f))) + "\n")
 	b.WriteString(FormatKV("Size", CardValueStyle.Render(fmt.Sprintf("%s (%d B)", FormatBytes(f.GetEffectiveSize()), f.GetEffectiveSize()))) + "\n")
 	b.WriteString(FormatKV("MIME Type", CardDimmedStyle.Render(f.MimeType)) + "\n")
 

@@ -14,7 +14,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/jurek-zsl/ohio-cli)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Release](https://img.shields.io/badge/Version-v2.1.0-orange?style=for-the-badge)](https://github.com/jurek-zsl/ohio-cli/releases)
+[![Release](https://img.shields.io/badge/Version-v2.2.0-orange?style=for-the-badge)](https://github.com/jurek-zsl/ohio-cli/releases)
 [![Security](https://img.shields.io/badge/Security-UDRKS%203--Tier-red?style=for-the-badge)](https://github.com/jurek-zsl/ohio-cli)
 
 **The Ultimate OhioFiles Command-Line Interface & Interactive Terminal Dashboard**  
@@ -52,7 +52,7 @@ go install github.com/jurek-zsl/ohio-cli/cmd/ohio@latest
 ```bash
 git clone https://github.com/jurek-zsl/Next-OhioFiles.git
 cd Next-OhioFiles/cli
-go build -o bin/ohio ./cmd/ohfs
+go build -o bin/ohio ./cmd/ohio
 # Optional: link alias
 ln -sf $(pwd)/bin/ohio $(pwd)/bin/ohfs
 ```
@@ -103,16 +103,16 @@ ohio t
 ```
 
 ```text
-┌─ ◆ ohfs v2.1.0     👤 GopherPilot (ohio_FastMonkey252)                   ● ONLINE ─┐
+┌─ ◆ ohio v2.2.0     👤 GopherPilot (ohio_FastMonkey252)                   ● ONLINE ─┐
 │                                                                                    │
-│   [ 1 Files ]   2 Upload   3 Feed   4 Session   5 Settings/Help                    │
+│   [ 1 Files ]   2 Folders   3 Upload   4 Feed   5 Session   6 Settings/Help        │
 │                                                                                    │
-│   FILENAME                       SLUG           SIZE       VISIBILITY   DOWNLOADS  │
-│  ▸architecture-spec.pdf          arch-v2        2.4 MB     [Private]    14         │
-│   database-backup.sql.gz         db-prod-82     84.1 MB    [1-Time]     0          │
-│   presentation-slides.key        keynote-q3     18.9 MB    [Public]     88         │
+│   FILENAME                  LOCATION    SLUG       SIZE       VISIBILITY  DLS      │
+│  ▸architecture-spec.pdf     / (root)    arch-v2    2.4 MB     [Private]   14       │
+│   database-backup.sql.gz    📁 backups  db-prod-82 84.1 MB    [1-Time]    0        │
+│   presentation-slides.key   📁 assets   keynote-q3 18.9 MB    [Public]    88       │
 │                                                                                    │
-│  [Tab] Switch tabs  •  [1-5] Jump  •  [/] Filter  •  [s] Share/QR  •  [q] Quit     │
+│  [Tab] Switch tabs  •  [1-6] Jump  •  [/] Filter  •  [s] Share/QR  •  [q] Quit     │
 └────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -120,29 +120,38 @@ ohio t
 
 1. **📁 Tab 1: Files Explorer**
    * View all active uploads tied to your public session key.
+   * Explicit **LOCATION** tracking: reveals whether files reside in `/ (root)` or a specific subfolder (`📁 <folder>`).
    * Visual indicators for **Public**, **Private**, **1-Time Burn**, and **Password Protected** files.
    * Real-time metrics: Download counts, human-readable file sizes, and relative upload timestamps.
    * Interactive search filter activated with `/` to match filenames or slugs on the fly.
    * Direct actions: download (`d`), share / QR modal (`s` or `Enter`), or delete (`x`).
 
-2. **📤 Tab 2: Quick Upload**
+2. **🗂️ Tab 2: Folders Explorer**
+   * Full session folder tree management.
+   * Browse folders with metadata: slug, visibility status, creation timestamps.
+   * Jump into any folder by pressing `Enter` to filter the **Files Explorer** exclusively to that folder.
+   * In-line quick folder creation (`n`).
+   * One-touch streaming ZIP archive download (`z`) for entire folder contents.
+   * Direct deletion of empty or obsolete folders (`x`).
+
+3. **📤 Tab 3: Quick Upload**
    * Clean multi-field form supporting local file paths with auto-expansion.
    * Optional custom slug input and optional password lock.
    * Instant radio toggles for **Public Visibility** (`p`) and **One-Time Burn** (`o`).
-   * Animated multi-stage upload progress indicator.
+   * Real-time, animated streaming progress bar displaying percentage, bytes transferred, and moving-average upload speed.
 
-3. **🌐 Tab 3: Public Feed**
+4. **🌐 Tab 4: Public Feed**
    * Live streaming discovery of files published publicly across OhioFiles.
    * Incremental pagination and real-time search filtering (`/`).
    * One-click download (`d`) or terminal QR view (`s` or `Enter`) without registering accounts.
 
-4. **👤 Tab 4: Sessions & Identity**
+5. **👤 Tab 5: Sessions & Identity**
    * Displays active session key, current display nickname, and public profile slug.
    * Live API endpoint connectivity indicator and device fingerprint ID.
    * Generate memorable human keys (`n`) or cryptographic 192-bit secure keys (`s`).
    * Edit display nickname inline (`e`) or copy session key straight to clipboard (`c`).
 
-5. **⚙️ Tab 5: Settings & Help**
+6. **⚙️ Tab 6: Settings & Help**
    * Two-column split reference showing all dashboard hotkeys alongside CLI commands.
    * Persistent status feedback for connected server endpoints and local config states.
 
@@ -150,22 +159,25 @@ ohio t
 
 | Keybinding | Scope | Description |
 | :--- | :--- | :--- |
-| `Tab` / `Shift+Tab` | Global | Cycle forward / backward through tabs (1 through 5) |
-| `1` – `5` | Global | Instantly switch to specific tab (Files, Upload, Feed, Session, Help) |
+| `Tab` / `Shift+Tab` | Global | Cycle forward / backward through tabs (1 through 6) |
+| `1` – `6` | Global | Instantly switch to specific tab (Files, Folders, Upload, Feed, Session, Help) |
 | `↑` / `↓` or `k` / `j` | List Views | Move cursor selection up / down |
 | `g` / `G` | List Views | Jump cursor to top / bottom of current list |
 | `/` | Files / Feed | Activate real-time fuzzy filter / search bar |
 | `Enter` | Files / Feed | Open Share Modal with ASCII QR Code and direct URL |
+| `Enter` | Folders Tab | Open selected folder in Files Explorer tab |
 | `Enter` | Upload Tab | Toggle visibility, one-time burn, or trigger file upload |
 | `d` | Files / Feed | Download currently highlighted file to working directory |
 | `s` | Files / Feed | Show share card and ASCII QR modal |
+| `z` | Folders Tab | Download entire folder as streaming compressed ZIP archive |
+| `n` | Folders Tab | Create a new folder in session |
 | `c` | Session Tab | Copy active session key to system clipboard |
 | `e` | Session Tab | Edit and rename session nickname inline |
 | `n` | Session Tab | Generate and activate a new **memorable** session key |
 | `s` | Session Tab | Generate and activate a new **192-bit secure** cryptographic key |
-| `x` | Files Tab | Permanently delete the highlighted file from your session |
+| `x` | Files / Folders | Permanently delete the highlighted file or folder |
 | `p` / `o` | Upload Tab | Toggle **Public** visibility (`p`) / **One-Time** burn (`o`) |
-| `r` | Files / Feed | Refresh remote file listings |
+| `r` | All Tabs | Refresh remote file or folder listings |
 | `Esc` | Modal / Search | Close share QR modal or cancel search filter input |
 | `q` / `Ctrl+C` | Global | Quit the interactive TUI application |
 
@@ -322,14 +334,20 @@ ohio uninstall
 Removes the `ohio` and `ohfs` binaries from `/usr/local/bin` (or `~/.local/bin`), while **safely preserving** your session keys and local cache at `~/.config/ohio/config.json`. When you reinstall later, your active session and files are instantly available.
 
 ### Nuclear Wipe (`ohio -udrks` / `ohio udrks`)
-For air-gapped environments, shared workstations, or ephemeral cloud nodes, the **UDRKS** protocol (*Uninstall-Delete-Revoke-Kill-Service*) provides a complete 3-tier purge:
+For air-gapped environments, shared workstations, or ephemeral cloud nodes, the **UDRKS** protocol (*Uninstall-Delete-Revoke-Kill-Service*) provides a complete 3-tier purge.
 
+To prevent accidental wipe, UDRKS enforces a **3-step interactive confirmation sequence**:
+1. `[Step 1/3]` Confirm initiation (`y` / `yes`)
+2. `[Step 2/3]` Permanent and irreversible warning (type `CONFIRM` or `YES`)
+3. `[Step 3/3]` Final safeguard to execute purge (type `PURGE`)
+
+For non-interactive automation or headless scripts, pass `--force` / `-f` to bypass interactive prompts:
 ```bash
-ohio -udrks
+ohio -udrks --force
 # or
-ohio udrks
+ohio udrks -f
 # or
-ohio uninstall --udrks
+ohio uninstall --udrks --force
 ```
 
 ```text

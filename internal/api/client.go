@@ -21,7 +21,7 @@ const (
 	DefaultTimeout  = 60 * time.Second
 	UploadTimeout   = 30 * time.Minute
 	DownloadTimeout = 60 * time.Minute
-	UserAgentHeader = "OhioFiles-CLI/1.0"
+	UserAgentHeader = "OhioCLI/2.2.0"
 	DefaultChunkSize = 8 * 1024 * 1024 // 8 MB
 	LargeFileThreshold = 50 * 1024 * 1024 // 50 MB
 )
@@ -380,19 +380,32 @@ func (c *Client) DownloadFile(idOrSlug, outputPath, token, sessionKey string, on
 	}
 
 	// Determine final output path
+	targetFilename := expectedFilename
+	if targetFilename == "" {
+		targetFilename = idOrSlug
+	}
+
 	if outputPath == "" {
-		if expectedFilename != "" {
-			outputPath = expectedFilename
-		} else {
-			outputPath = idOrSlug
-		}
+		outputPath = targetFilename
 	} else {
-		fileStat, statErr := os.Stat(outputPath)
-		if statErr == nil && fileStat.IsDir() {
-			if expectedFilename != "" {
-				outputPath = filepath.Join(outputPath, expectedFilename)
-			} else {
-				outputPath = filepath.Join(outputPath, idOrSlug)
+		isDirTarget := strings.HasSuffix(outputPath, "/") || strings.HasSuffix(outputPath, "\\")
+		if !isDirTarget {
+			if fileStat, statErr := os.Stat(outputPath); statErr == nil && fileStat.IsDir() {
+				isDirTarget = true
+			}
+		}
+
+		if isDirTarget {
+			if err := os.MkdirAll(outputPath, 0755); err != nil {
+				return fmt.Errorf("failed to create target directory: %w", err)
+			}
+			outputPath = filepath.Join(outputPath, targetFilename)
+		} else {
+			dir := filepath.Dir(outputPath)
+			if dir != "" && dir != "." {
+				if err := os.MkdirAll(dir, 0755); err != nil {
+					return fmt.Errorf("failed to create destination directory: %w", err)
+				}
 			}
 		}
 	}
@@ -887,6 +900,12 @@ func (c *Client) DownloadFolderZip(folderIdOrSlug, outputPath string, onProgress
 
 	if outputPath == "" {
 		outputPath = fmt.Sprintf("folder-%s.zip", folderIdOrSlug)
+	} else {
+		if dir := filepath.Dir(outputPath); dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return fmt.Errorf("failed to create output directory: %w", err)
+			}
+		}
 	}
 
 	out, err := os.OpenFile(outputPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
