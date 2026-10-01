@@ -36,6 +36,9 @@ func ResolveWebRoot(apiURL string) string {
 	if strings.Contains(u, "://api.") {
 		u = strings.Replace(u, "://api.", "://", 1)
 	}
+	if strings.Contains(u, "ohfs.app") {
+		u = strings.ReplaceAll(u, "ohfs.app", "ohiofiles.cloud")
+	}
 	return u
 }
 

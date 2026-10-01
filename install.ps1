@@ -50,7 +50,7 @@ if ($LocalBinary) {
     # Candidate release URLs
     $CandidateUrls = @(
         "https://github.com/jurek-zsl/ohio-cli/releases/latest/download/ohio-windows-$Arch.exe",
-        "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.2.0/ohio-windows-$Arch.exe",
+        "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.2.1/ohio-windows-$Arch.exe",
         "https://api.ohiofiles.cloud/releases/latest/ohio-windows-$Arch.exe"
     )
     
@@ -118,7 +118,7 @@ if ($UserPath -notlike "*$InstallDir*") {
 Write-Host ""
 Write-Host "✔ Successfully installed OhioCLI!" -ForegroundColor Green
 Write-Host "  Location: $OhioExe (alias: ohfs.exe)"
-Write-Host "  Version:  v2.2.0"
+Write-Host "  Version:  v2.2.1"
 Write-Host ""
 Write-Host "Quick Start:" -ForegroundColor White
 Write-Host "  ohio tui              Launch interactive TUI dashboard" -ForegroundColor Cyan

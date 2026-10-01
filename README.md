@@ -14,7 +14,7 @@
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://golang.org)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-blue?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/jurek-zsl/ohio-cli)
 [![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
-[![Release](https://img.shields.io/badge/Version-v2.2.0-orange?style=for-the-badge)](https://github.com/jurek-zsl/ohio-cli/releases)
+[![Release](https://img.shields.io/badge/Version-v2.2.1-orange?style=for-the-badge)](https://github.com/jurek-zsl/ohio-cli/releases)
 [![Security](https://img.shields.io/badge/Security-UDRKS%203--Tier-red?style=for-the-badge)](https://github.com/jurek-zsl/ohio-cli)
 
 **The Ultimate OhioFiles Command-Line Interface & Interactive Terminal Dashboard**  
@@ -103,7 +103,7 @@ ohio t
 ```
 
 ```text
-┌─ ◆ ohio v2.2.0     👤 GopherPilot (ohio_FastMonkey252)                   ● ONLINE ─┐
+┌─ ◆ ohio v2.2.1     👤 GopherPilot (ohio_FastMonkey252)                   ● ONLINE ─┐
 │                                                                                    │
 │   [ 1 Files ]   2 Folders   3 Upload   4 Feed   5 Session   6 Settings/Help        │
 │                                                                                    │

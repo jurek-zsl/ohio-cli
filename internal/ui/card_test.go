@@ -45,3 +45,26 @@ func TestRenderFolderZipSuccess(t *testing.T) {
 		t.Errorf("expected output to contain '2.0 MB', got: %s", out)
 	}
 }
+
+func TestResolveWebRoot(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"", "https://ohiofiles.cloud"},
+		{"https://api.ohiofiles.cloud", "https://ohiofiles.cloud"},
+		{"https://api.ohfs.app", "https://ohiofiles.cloud"},
+		{"https://ohfs.app", "https://ohiofiles.cloud"},
+		{"http://localhost:3000/api", "http://localhost:3000"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := ResolveWebRoot(tt.input)
+			if got != tt.want {
+				t.Errorf("ResolveWebRoot(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+

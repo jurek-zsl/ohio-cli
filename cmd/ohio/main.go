@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 	"ohio/internal/config"
 	"ohio/internal/tui"
 	"ohio/internal/ui"
+	"ohio/internal/update"
 )
 
 var (
@@ -1130,14 +1132,62 @@ func newFeedCmd() *cobra.Command {
 // ----------------------------------------------------------------------------
 
 func newUpdateCmd() *cobra.Command {
-	return &cobra.Command{
+	var (
+		flagCheck bool
+		flagForce bool
+	)
+
+	cmd := &cobra.Command{
 		Use:   "update",
 		Short: "Check for and install updates to OhioCLI",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Printf("%s OhioCLI is up to date (%s)\n", ui.CardCheckmarkStyle.Render("✔"), version)
+			rel, err := update.FetchLatestRelease(cmd.Context(), "jurek-zsl/ohio-cli")
+			if err != nil {
+				return fmt.Errorf("failed to check for updates: %w", err)
+			}
+
+			cmp := update.CompareVersions(rel.TagName, version)
+
+			if flagCheck {
+				if cmp > 0 {
+					fmt.Printf("⚡ New update available: %s (current: v%s)\nRun 'ohio update' to install.\n", rel.TagName, version)
+				} else {
+					fmt.Printf("%s OhioCLI is up to date (v%s)\n", ui.CardCheckmarkStyle.Render("✔"), version)
+				}
+				return nil
+			}
+
+			if cmp <= 0 && !flagForce {
+				fmt.Printf("%s OhioCLI is up to date (v%s)\n", ui.CardCheckmarkStyle.Render("✔"), version)
+				fmt.Println(ui.CardDimmedStyle.Render("Use 'ohio update --force' to force re-install."))
+				return nil
+			}
+
+			fmt.Printf("⚡ Updating OhioCLI from v%s to %s...\n", version, rel.TagName)
+
+			asset, err := update.FindAsset(rel.Assets, runtime.GOOS, runtime.GOARCH)
+			if err != nil {
+				return err
+			}
+
+			bar := ui.NewProgressBar("Downloading", asset.Name, asset.Size, flagQuiet || flagJson)
+			targetPath, err := update.ApplyUpdate(cmd.Context(), asset.BrowserDownloadURL, asset.Size, func(written, total int64) {
+				bar.Update(written, total)
+			})
+			bar.Finish()
+			if err != nil {
+				return fmt.Errorf("failed to apply update: %w", err)
+			}
+
+			fmt.Printf("\n%s Successfully updated OhioCLI to %s (%s)\n", ui.CardCheckmarkStyle.Render("✔"), rel.TagName, targetPath)
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&flagCheck, "check", false, "Check if an update is available without downloading")
+	cmd.Flags().BoolVarP(&flagForce, "force", "f", false, "Force re-download and re-install even if up to date")
+
+	return cmd
 }
 
 // ----------------------------------------------------------------------------

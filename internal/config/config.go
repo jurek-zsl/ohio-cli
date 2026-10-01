@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	Version        = "2.2.0"
+	Version        = "2.2.1"
 	DefaultApiUrl  = "https://api.ohiofiles.cloud"
 	ConfigDirName  = "ohio"
 	ConfigFileName = "config.json"
@@ -77,6 +77,10 @@ func Load() (*Config, error) {
 	if cfg.ApiUrl == "" {
 		cfg.ApiUrl = DefaultApiUrl
 	}
+	if strings.Contains(cfg.ApiUrl, "ohfs.app") {
+		cfg.ApiUrl = strings.ReplaceAll(cfg.ApiUrl, "ohfs.app", "ohiofiles.cloud")
+		_ = cfg.Save()
+	}
 	if cfg.DeviceId == "" {
 		cfg.EnsureDeviceId()
 		_ = cfg.Save()
@@ -121,13 +125,25 @@ func (c *Config) Save() error {
 // ResolveApiUrl returns the resolved API URL, prioritizing environment variables OHIO_API_URL or OHFS_API_URL.
 func (c *Config) ResolveApiUrl() string {
 	if envUrl := strings.TrimSpace(os.Getenv("OHIO_API_URL")); envUrl != "" {
-		return strings.TrimRight(envUrl, "/")
+		envUrl = strings.TrimRight(envUrl, "/")
+		if strings.Contains(envUrl, "ohfs.app") {
+			envUrl = strings.ReplaceAll(envUrl, "ohfs.app", "ohiofiles.cloud")
+		}
+		return envUrl
 	}
 	if envUrl := strings.TrimSpace(os.Getenv("OHFS_API_URL")); envUrl != "" {
-		return strings.TrimRight(envUrl, "/")
+		envUrl = strings.TrimRight(envUrl, "/")
+		if strings.Contains(envUrl, "ohfs.app") {
+			envUrl = strings.ReplaceAll(envUrl, "ohfs.app", "ohiofiles.cloud")
+		}
+		return envUrl
 	}
 	if strings.TrimSpace(c.ApiUrl) != "" {
-		return strings.TrimRight(strings.TrimSpace(c.ApiUrl), "/")
+		apiUrl := strings.TrimRight(strings.TrimSpace(c.ApiUrl), "/")
+		if strings.Contains(apiUrl, "ohfs.app") {
+			apiUrl = strings.ReplaceAll(apiUrl, "ohfs.app", "ohiofiles.cloud")
+		}
+		return apiUrl
 	}
 	return DefaultApiUrl
 }
