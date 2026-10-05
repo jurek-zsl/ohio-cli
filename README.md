@@ -102,19 +102,7 @@ ohio tui
 ohio t
 ```
 
-```text
-┌─ ◆ ohio v2.2.1     👤 GopherPilot (ohio_FastMonkey252)                   ● ONLINE ─┐
-│                                                                                    │
-│   [ 1 Files ]   2 Folders   3 Upload   4 Feed   5 Session   6 Settings/Help        │
-│                                                                                    │
-│   FILENAME                  LOCATION    SLUG       SIZE       VISIBILITY  DLS      │
-│  ▸architecture-spec.pdf     / (root)    arch-v2    2.4 MB     [Private]   14       │
-│   database-backup.sql.gz    📁 backups  db-prod-82 84.1 MB    [1-Time]    0        │
-│   presentation-slides.key   📁 assets   keynote-q3 18.9 MB    [Public]    88       │
-│                                                                                    │
-│  [Tab] Switch tabs  •  [1-6] Jump  •  [/] Filter  •  [s] Share/QR  •  [q] Quit     │
-└────────────────────────────────────────────────────────────────────────────────────┘
-```
+![OhioCLI Interactive TUI Dashboard](https://api.ohiofiles.cloud/gZhpAi)
 
 ### Detailed Tab Walkthrough
 

@@ -637,16 +637,16 @@ func handleWatchUpload(filePath string, opts api.UploadOptions, flagQR bool) err
 				lastMod = currFi.ModTime()
 				uploadStart := time.Now()
 
-				// If re-uploading with custom slug, remove the previous file so slug is available
-				if opts.CustomSlug != "" && lastItem != nil {
-					_ = client.DeleteFile(lastItem.Slug, client.SessionKey)
-				}
+				// For subsequent watch re-uploads, do not reuse the initial custom slug to avoid 409 collision,
+				// and never delete the existing file before re-uploading.
+				reuploadOpts := opts
+				reuploadOpts.CustomSlug = ""
 
 				barChange := ui.NewProgressBar("Re-uploading", filepath.Base(filePath), currFi.Size(), flagQuiet || flagJson)
 				onDirectChange := func(w, tot int64) { barChange.Update(w, tot) }
 				onChunkChange := func(c, tc int) { barChange.UpdateChunk(c, tc, currFi.Size()) }
 
-				item, err := client.Upload(filePath, opts, onDirectChange, onChunkChange)
+				item, err := client.Upload(filePath, reuploadOpts, onDirectChange, onChunkChange)
 				barChange.Finish()
 				if err != nil {
 					fmt.Printf("  [%s] ✖ Re-upload failed: %v\n", time.Now().Format("15:04:05"), err)
