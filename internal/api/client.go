@@ -21,7 +21,7 @@ const (
 	DefaultTimeout  = 60 * time.Second
 	UploadTimeout   = 30 * time.Minute
 	DownloadTimeout = 60 * time.Minute
-	UserAgentHeader = "OhioCLI/2.2.1"
+	UserAgentHeader = "OhioCLI/2.2.2"
 	DefaultChunkSize = 8 * 1024 * 1024 // 8 MB
 	LargeFileThreshold = 50 * 1024 * 1024 // 50 MB
 )

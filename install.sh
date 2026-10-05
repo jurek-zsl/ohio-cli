@@ -72,7 +72,7 @@ else
   # Remote release download
   CANDIDATE_URLS=(
     "https://github.com/jurek-zsl/ohio-cli/releases/latest/download/ohio-${OS}-${ARCH_TARGET}"
-    "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.2.1/ohio-${OS}-${ARCH_TARGET}"
+    "https://github.com/jurek-zsl/ohio-cli/releases/download/v2.2.2/ohio-${OS}-${ARCH_TARGET}"
     "https://api.ohiofiles.cloud/releases/latest/ohio-${OS}-${ARCH_TARGET}"
   )
   DOWNLOADED=0
@@ -121,7 +121,7 @@ fi
 
 echo -e "\n${GREEN}${BOLD}✔ Successfully installed OhioCLI!${RESET}"
 echo -e "  Command:  ${CYAN}${INSTALL_DIR}/ohio${RESET} (alias: ${CYAN}ohfs${RESET})"
-echo -e "  Version:  ${BOLD}v2.2.1${RESET}"
+echo -e "  Version:  ${BOLD}v2.2.2${RESET}"
 echo -e "\n${BOLD}Quick Start:${RESET}"
 echo -e "  ${CYAN}ohio tui${RESET}              Launch full-screen interactive dashboard"
 echo -e "  ${CYAN}ohio -u file.txt${RESET}      Instantly upload a file"
